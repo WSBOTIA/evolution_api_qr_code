@@ -1,95 +1,127 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client'
+
+import { fetchInstances, getQr } from "./services/evolution.api.service";
+import { useEffect, useState } from "react";
+import React from 'react'
+import { CToast, CToastBody, CToastClose, CToaster, CContainer, CRow, CCol, CForm, CFormLabel, CFormSelect, CFormInput, CButton, CImage } from '@coreui/react'
+import { getCountryCodes } from "./services/country.codes";
 
 export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>src/app/page.js</code>.
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const countryList = getCountryCodes();
+  const [countryCode, setCountryCode] = useState(countryList[0].code);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [toasts, setToasts] = useState([]);
+  const [instances, setInstances] = useState([]); // Almacena las instancias
+  const [qr, setQR] = useState('/qr_code.jpg')
+  useEffect(() => {
+    fetchInstances()
+      .then(resp => {
+        const { success, response } = resp;
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+        if (success) {
+          setInstances(response.data); // Guardamos las instancias en el estado
+          showToast(response.msg, 'success');
+        } else {
+          showToast("Ocurrió un error al obtener las instancias", 'danger');
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        showToast("Error de conexión", 'danger');
+      });
+  }, []); // Se ejecuta solo una vez al montar el componente
+
+  // Función para mostrar un toast dinámico y ocultarlo después de un tiempo
+  const showToast = (message, color) => {
+    const id = Date.now();
+    setToasts((prevToasts) => [...prevToasts, { id, message, color, visible: true }]);
+
+    // Ocultar automáticamente después de 3 segundos
+    setTimeout(() => {
+      setToasts((prevToasts) => prevToasts.filter(toast => toast.id !== id));
+    }, 3000);
+  };
+
+  // Manejar envío del formulario
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const finalNumber = `${countryCode}${phoneNumber}`;
+
+    // Buscar en las instancias si ya existe
+    const foundInstance = instances.find(instance => instance.number === finalNumber);
+
+    if (foundInstance) {
+      showToast(`Número ${finalNumber} encontrado en las instancias ✅`, 'success');
+      getQr(foundInstance.name).then(resp => {
+        console.log("QR", resp)
+        const {success, response} = resp
+        if(success) {
+          setQR(response.data.base64)
+        }else{
+          console.log("Error al obtener qr")
+        }
+      }).catch(err => {
+        console.log(err)
+      })
+    } else {
+      showToast(`Número ${finalNumber} NO encontrado ❌`, 'danger');
+    }
+  };
+
+  return (
+    <>
+      <CContainer className="vh-100 d-flex align-items-center justify-content-center">
+        <CRow className="w-100">
+          {/* Sección Izquierda - Formulario */}
+          <CCol md={4} className="p-4 border-end align-items-center justify-content-center">
+            <h5>Ingrese su número</h5>
+            <CForm onSubmit={handleSubmit}>
+              {/* Selector de País */}
+              <CFormLabel htmlFor="countrySelect">Código del País</CFormLabel>
+              <CFormSelect id="countrySelect" value={countryCode} onChange={(e) => setCountryCode(e.target.value)}>
+                {countryList.map((country) => (
+                  <option key={country.code} value={country.code}>
+                    {country.flag} {country.name} (+{country.code})
+                  </option>
+                ))}
+              </CFormSelect>
+
+              {/* Input del Teléfono */}
+              <CFormLabel htmlFor="phoneInput" className="mt-3">Número de Teléfono</CFormLabel>
+              <CFormInput
+                id="phoneInput"
+                type="tel"
+                placeholder="Ej: 4148315972"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/, ''))} // Solo números
+                maxLength={10}
+              />
+
+              {/* Botón de Enviar */}
+              <CButton type="submit" color="primary" className="mt-3 w-100">
+                Enviar
+              </CButton>
+            </CForm>
+          </CCol>
+
+          {/* Sección Derecha - Espacio Libre */}
+          <CCol md={8} className="p-4 d-flex align-items-center justify-content-center">
+            <CImage align="start" rounded src={qr} width={300} height={300} />
+          </CCol>
+        </CRow>
+      </CContainer>
+
+      {/* TOAST NOTIFICATIONS */}
+      <CToaster placement="top-end">
+        {toasts.map((toast) => (
+          <CToast key={toast.id} autohide={true} visible={toast.visible} color={toast.color} className="text-white align-items-center">
+            <div className="d-flex">
+              <CToastBody>{toast.message}</CToastBody>
+              <CToastClose className="me-2 m-auto" onClick={() => setToasts(toasts.filter(t => t.id !== toast.id))} />
+            </div>
+          </CToast>
+        ))}
+      </CToaster>
+    </>
   );
 }

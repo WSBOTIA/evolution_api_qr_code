@@ -1,0 +1,9 @@
+
+const CONFIG = {
+    EVOLUTION_API_URL : process.env.EVOLUTION_API_URL || "http://localhost",
+    EVOLUTION_API_PORT : process.env.EVOLUTION_API_PORT || 8080,
+    EVOLUTION_API_KEY : process.env.EVOLUTION_API_KEY || "429683C4C977415CAAFCCE10F7D57E11"
+}
+
+
+export default CONFIG
