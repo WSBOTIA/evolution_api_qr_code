@@ -1,6 +1,6 @@
 'use client'
 
-import { fetchInstances, getQr } from "./services/evolution.api.service";
+import { connectionState, fetchInstances, getQr } from "./services/evolution.api.service";
 import { useEffect, useState } from "react";
 import React from 'react'
 import { CToast, CToastBody, CToastClose, CToaster, CContainer, CRow, CCol, CForm, CFormLabel, CFormSelect, CFormInput, CButton, CImage } from '@coreui/react'
@@ -13,6 +13,8 @@ export default function Home() {
   const [toasts, setToasts] = useState([]);
   const [instances, setInstances] = useState([]); // Almacena las instancias
   const [qr, setQR] = useState('/qr_code.jpg')
+  const [status, setStatus] = useState('')
+  const [instanceName, setInstanceName] = useState()
   useEffect(() => {
     fetchInstances()
       .then(resp => {
@@ -20,6 +22,7 @@ export default function Home() {
 
         if (success) {
           setInstances(response.data); // Guardamos las instancias en el estado
+          console.log(response.data)
           showToast(response.msg, 'success');
         } else {
           showToast("Ocurrió un error al obtener las instancias", 'danger');
@@ -30,6 +33,12 @@ export default function Home() {
         showToast("Error de conexión", 'danger');
       });
   }, []); // Se ejecuta solo una vez al montar el componente
+
+
+  const getConnectionStatus = (instance) => {
+    return connectionState(instance)
+  }
+
 
   // Función para mostrar un toast dinámico y ocultarlo después de un tiempo
   const showToast = (message, color) => {
@@ -52,17 +61,47 @@ export default function Home() {
 
     if (foundInstance) {
       showToast(`Número ${finalNumber} encontrado en las instancias ✅`, 'success');
-      getQr(foundInstance.name).then(resp => {
-        console.log("QR", resp)
-        const {success, response} = resp
-        if(success) {
-          setQR(response.data.base64)
-        }else{
-          console.log("Error al obtener qr")
+      setInstanceName(foundInstance.name)
+      console.log("INSTANCE NAME ", instanceName)
+      getConnectionStatus(foundInstance.name).then(resp => {
+        console.log("Estado de conexion", resp)
+        const { success, response } = resp
+        if (success) {
+
+          showToast(response.msg, 'success');
+          const state = response.data.instance.state
+          console.log("STATE ", state)
+          setStatus(state)
+          console.log(status)
+
+          if (state === 'close' || state === 'connecting') {
+            getQr(foundInstance.name).then(resp => {
+              console.log("QR", resp)
+              const { success, response } = resp
+              if (success) {
+                setQR(response.data.base64)
+              } else {
+                console.log("Error al obtener qr")
+              }
+            }).catch(err => {
+              console.log(err)
+            })
+          } else {
+
+          }
+
+
+        } else {
+          console.log("Error al obtener el estado de conexion")
         }
+
+
+
       }).catch(err => {
         console.log(err)
       })
+
+
     } else {
       showToast(`Número ${finalNumber} NO encontrado ❌`, 'danger');
     }
@@ -106,7 +145,31 @@ export default function Home() {
 
           {/* Sección Derecha - Espacio Libre */}
           <CCol md={8} className="p-4 d-flex align-items-center justify-content-center">
-            <CImage align="start" rounded src={qr} width={300} height={300} />
+            {
+              status === 'close' || status === 'connecting' || status === '' ? (
+
+                <CRow>
+                  {
+                    status !== '' ? (
+                      <CCol md={12}>
+                        <h2>Bienvenido {instanceName ? instanceName : ""}</h2>
+                        <p>Escanea el codigo QR paa conectar con tu whatsapp</p>
+                      </CCol>
+                    ) : ""
+                  }
+                  <CCol md={12}>
+                    <CImage align="start" rounded src={qr} width={300} height={300} />
+                  </CCol>
+
+                </CRow>
+
+              ) : (
+                <CCol md={12}>
+                  <h2>Bienvenido {instanceName ? instanceName : ""}</h2>
+                  <p>Ya estas conectado</p>
+                </CCol>
+              )
+            }
           </CCol>
         </CRow>
       </CContainer>
