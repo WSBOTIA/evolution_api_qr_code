@@ -9,6 +9,8 @@ import {
 } from '@coreui/react';
 import { connectionState, fetchInstances, getQr } from "./services/evolution.api.service";
 import { getCountryCodes } from "./services/country.codes";
+import { CIcon } from '@coreui/icons-react';
+import { cilReload } from '@coreui/icons';
 
 export default function Home() {
   const countryList = getCountryCodes();
@@ -19,6 +21,8 @@ export default function Home() {
   const [selectedInstance, setSelectedInstance] = useState(null);
   const [instances, setInstances] = useState([]);
   const [countdown, setCountdown] = useState(45);
+  const [qrAttempts, setQrAttempts] = useState(0);
+  const [qrRefresh, setQrRefresh] = useState(false);
 
   useEffect(() => {
     const loadInstances = async () => {
@@ -39,29 +43,47 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (selectedInstance && (selectedInstance.state === 'close' || selectedInstance.state === 'connecting')) {
+    if (selectedInstance && (selectedInstance.state === 'close' || selectedInstance.state === 'connecting') && qrAttempts < 3) {
       const interval = setInterval(async () => {
-        const { success, response } = await getQr(selectedInstance.name);
-        if (success) {
-          setQR(response.data.base64);
-          setCountdown(45);
+        if (qrAttempts < 3) {
+          const { success, response } = await getQr(selectedInstance.name);
+          if (success) {
+            setQR(response.data.base64);
+            setCountdown(45); // Reinicia el contador
+            setQrAttempts(prev => prev + 1);
+          } else {
+            showToast("Error al actualizar el código QR", 'danger');
+          }
         } else {
-          showToast("Error al actualizar el código QR", 'danger');
+          setQrRefresh(true); // Muestra el icono de regeneración
+          clearInterval(interval);
         }
       }, 45000);
 
       return () => clearInterval(interval);
     }
-  }, [selectedInstance]);
+  }, [selectedInstance, qrAttempts]);
 
   useEffect(() => {
     if (selectedInstance && (selectedInstance.state === 'close' || selectedInstance.state === 'connecting')) {
+      setCountdown(45); // Reinicia el contador cada vez que se seleccione una instancia
+      setQrRefresh(false); // Asegura que el icono esté oculto al inicio
+  
       const countdownInterval = setInterval(() => {
-        setCountdown(prev => (prev > 0 ? prev - 1 : 0));
+        console.log(qrAttempts)
+        setCountdown(prev => {
+          // Muestra el icono solo cuando faltan 3 segundos
+          if (prev === 1 && qrAttempts === 3) {
+            setQrRefresh(true);  // Activa el icono cuando faltan 3 segundos
+          }
+          return prev > 0 ? prev - 1 : 0;
+        });
       }, 1000);
+  
       return () => clearInterval(countdownInterval);
     }
-  }, [selectedInstance]);
+  }, [selectedInstance, qrAttempts]);
+  
 
   const showToast = (message, color) => {
     const id = Date.now();
@@ -71,6 +93,9 @@ export default function Home() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setQrAttempts(0);
+    setQrRefresh(false);
+    setCountdown(45); // Reinicia el contador cuando se envía el formulario
     const finalNumber = `${countryCode}${phoneNumber}`;
     const foundInstance = instances.find(instance => instance.number === finalNumber);
 
@@ -89,6 +114,7 @@ export default function Home() {
             if (qrSuccess) {
               setQR(qrResponse.data.base64);
               setCountdown(45);
+              setQrAttempts(1);
             } else {
               showToast("Error al obtener el código QR", 'danger');
             }
@@ -105,15 +131,27 @@ export default function Home() {
     }
   };
 
+  const handleQrRefresh = async () => {
+    setQrAttempts(0);
+    setQrRefresh(false);
+    if (selectedInstance) {
+      const { success, response } = await getQr(selectedInstance.name);
+      if (success) {
+        setQR(response.data.base64);
+        setCountdown(45);
+      } else {
+        showToast("Error al regenerar el código QR", 'danger');
+      }
+    }
+  };
+
   return (
     <>
       <CContainer className="vh-100 d-flex align-items-center justify-content-center">
         <CRow className="w-100 d-flex align-items-center justify-content-center">
-          <CCol md={5} className="p-4 border-end ">
-
-
+          <CCol md={5} className="p-4 border-end">
             <CCard id="form-container" style={{ width: '70%' }}>
-              <h4  class="text-center">INGRESE SU NUMERO</h4>
+              <h4 className="text-center">INGRESE SU NUMERO</h4>
               <CForm onSubmit={handleSubmit}>
                 <CFormLabel htmlFor="countrySelect"></CFormLabel>
                 <CFormSelect id="countrySelect" value={countryCode} onChange={(e) => setCountryCode(e.target.value)}>
@@ -145,14 +183,33 @@ export default function Home() {
                 <h2 id="title-qr">Bienvenido {selectedInstance.name}</h2>
                 {(selectedInstance.state === 'close' || selectedInstance.state === 'connecting') ? (
                   <>
-                    <p class="text-qr">Escanea el código QR en {countdown} segundos</p>
-                    <br/>
-                    <CImage id="qr" rounded src={qr} width={300} height={300} />
-                    <br/><br/>
-                    <p class="text-qr">Al culminarse el tiempo se generará un nuevo codigo QR</p>
+                    <p className="text-qr">Escanea el código QR en {countdown} segundos</p>
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                      <CImage id="qr" rounded src={qr} width={300} height={300} />
+                      {qrRefresh && (
+                        <CIcon
+                          icon={cilReload}
+                          size="xl"
+                          className="qr-refresh-icon"
+                          onClick={handleQrRefresh}
+                          style={{
+                            position: 'absolute',
+                            color:"black",
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            cursor: 'pointer',
+                            backgroundColor: 'white',
+                            borderRadius: '50%',
+                            padding: '10px'
+                          }}
+                        />
+                      )}
+                    </div>
+                    <p className="mt-3 text-qr">Al culminarse el tiempo se generará un nuevo código QR</p>
                   </>
                 ) : (
-                  <p class="text-qr">Ya estás conectado</p>
+                  <p className="text-qr">Ya estás conectado</p>
                 )}
               </>
             ) : (
@@ -164,17 +221,6 @@ export default function Home() {
           </CCol>
         </CRow>
       </CContainer>
-
-      <CToaster placement="top-end">
-        {toasts.map(({ id, message, color }) => (
-          <CToast key={id} autohide visible color={color} className="text-white align-items-center">
-            <div className="d-flex">
-              <CToastBody>{message}</CToastBody>
-              <CToastClose className="me-2 m-auto" onClick={() => setToasts(toasts.filter(t => t.id !== id))} />
-            </div>
-          </CToast>
-        ))}
-      </CToaster>
     </>
   );
 }
