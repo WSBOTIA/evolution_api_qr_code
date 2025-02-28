@@ -10,10 +10,23 @@
   }
 }
 
+@font-face {
+  font-family: "MyriadProRegular";
+  src: url(../../public/fonts/MYRIADPRO-REGULAR.OTF);
+}
+
+@font-face {
+  font-family: "MyriadProLigth";
+  src: url(../../public/fonts/MyriadPro-Light.otf);
+}
+
+
+
 html,
 body {
   max-width: 100vw;
   overflow-x: hidden;
+  background-image: url(../../public/fondo.png) !important;
 }
 
 body {
@@ -33,6 +46,53 @@ body {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+
+
+#form-container {
+  padding : 5vh !important;
+  font-family: "MyriadProRegular" !important;
+}
+
+
+input, select {
+  outline : none !important;
+  box-shadow: none !important;
+  border: none;
+  border-radius: 0 !important;
+  border-color: rgba(255,255,255,0) !important;
+  border-bottom-color: black !important;
+  
+}
+
+
+.button-submit {
+  margin-top: 5vh !important;
+  background-color: #1EBC61 !important;
+  color : white !important;
+  font-family: "MyriadProLigth" !important;
+}
+
+
+#col-qr {
+  color: white !important;
+  font-family: "MyriadProRegular" !important;
+}
+
+#qr {
+  background-color: white !important;
+  padding : 2vh !important;
+  filter: grayscale(100%) contrast(200%);
+}
+
+#title-qr {
+  font-size: 5vh !important;
+}
+
+.text-qr {
+  font-size: 2.5vh !important;
+  font-family: "MyriadProLigth" !important;
 }
 
 @media (prefers-color-scheme: dark) {
